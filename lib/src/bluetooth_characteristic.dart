@@ -46,9 +46,10 @@ class BluetoothCharacteristic {
   ///   - anytime `write()` is called
   ///   - anytime a notification arrives (if subscribed)
   ///   - when the device is disconnected it is cleared
-  List<int> get lastValue {
+  // List<int> get lastValue {
+  Uint8List get lastValue {
     String key = "$serviceUuid:$characteristicUuid";
-    return FlutterBluePlus._lastChrs[remoteId]?[key] ?? [];
+    return FlutterBluePlus._lastChrs[remoteId]?[key] ?? Uint8List(0);
   }
 
   /// this stream emits values:
@@ -56,7 +57,8 @@ class BluetoothCharacteristic {
   ///   - anytime `write()` is called
   ///   - anytime a notification arrives (if subscribed)
   ///   - and when first listened to, it re-emits the last value for convenience
-  Stream<List<int>> get lastValueStream => FlutterBluePlus._methodStream.stream
+  // Stream<List<int>> get lastValueStream => FlutterBluePlus._methodStream.stream
+  Stream<Uint8List> get lastValueStream => FlutterBluePlus._methodStream.stream
       .where((m) => m.method == "OnCharacteristicReceived" || m.method == "OnCharacteristicWritten")
       .map((m) => m.arguments)
       .map((args) => BmCharacteristicData.fromMap(args))
@@ -70,7 +72,8 @@ class BluetoothCharacteristic {
   /// this stream emits values:
   ///   - anytime `read()` is called
   ///   - anytime a notification arrives (if subscribed)
-  Stream<List<int>> get onValueReceived => FlutterBluePlus._methodStream.stream
+  // Stream<List<int>> get onValueReceived => FlutterBluePlus._methodStream.stream
+  Stream<Uint8List> get onValueReceived => FlutterBluePlus._methodStream.stream
       .where((m) => m.method == "OnCharacteristicReceived")
       .map((m) => m.arguments)
       .map((args) => BmCharacteristicData.fromMap(args))
@@ -158,7 +161,7 @@ class BluetoothCharacteristic {
   ///         2. the peripheral device must support the 'long write' ble protocol.
   ///         3. Interrupted transfers can leave the characteristic in a partially written state
   ///         4. If the mtu is small, it is very very slow.
-  Future<void> write(List<int> value,
+  Future<void> write(Uint8List value,
       {bool withoutResponse = false, bool allowLongWrite = false, int timeout = 15}) async {
     //  check args
     if (withoutResponse && allowLongWrite) {

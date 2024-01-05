@@ -446,7 +446,8 @@ class BmCharacteristicData {
   final Guid serviceUuid;
   final Guid? secondaryServiceUuid;
   final Guid characteristicUuid;
-  final List<int> value;
+  //final List<int> value;
+  final Uint8List value;
   final bool success;
   final int errorCode;
   final String errorString;
@@ -468,7 +469,8 @@ class BmCharacteristicData {
       serviceUuid: Guid(json['service_uuid']),
       secondaryServiceUuid: json['secondary_service_uuid'] != null ? Guid(json['secondary_service_uuid']) : null,
       characteristicUuid: Guid(json['characteristic_uuid']),
-      value: _hexDecode(json['value']),
+      // value: _hexDecode(json['value']),
+      value: json['value'],
       success: json['success'] != 0,
       errorCode: json['error_code'],
       errorString: json['error_string'],
@@ -514,7 +516,8 @@ class BmWriteCharacteristicRequest {
   final Guid characteristicUuid;
   final BmWriteType writeType;
   final bool allowLongWrite;
-  final List<int> value;
+  // final List<int> value;
+  final Uint8List value;
 
   BmWriteCharacteristicRequest({
     required this.remoteId,
@@ -534,7 +537,8 @@ class BmWriteCharacteristicRequest {
     data['characteristic_uuid'] = characteristicUuid.str;
     data['write_type'] = writeType.index;
     data['allow_long_write'] = allowLongWrite ? 1 : 0;
-    data['value'] = _hexEncode(value);
+    // data['value'] = _hexEncode(value);
+    data['value'] = value;
     return data;
   }
 }

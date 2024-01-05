@@ -25,7 +25,8 @@ class FlutterBluePlus {
   static final Map<DeviceIdentifier, BmMtuChangedResponse> _mtuValues = {};
   static final Map<DeviceIdentifier, String> _platformNames = {};
   static final Map<DeviceIdentifier, String> _advNames = {};
-  static final Map<DeviceIdentifier, Map<String, List<int>>> _lastChrs = {};
+  // static final Map<DeviceIdentifier, Map<String, List<int>>> _lastChrs = {};
+  static final Map<DeviceIdentifier, Map<String, Uint8List>> _lastChrs = {};
   static final Map<DeviceIdentifier, Map<String, List<int>>> _lastDescs = {};
   static final Map<DeviceIdentifier, List<StreamSubscription>> _subscriptions = {};
   static final Set<DeviceIdentifier> _autoConnect = {};

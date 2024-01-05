@@ -104,7 +104,8 @@ public class FlutterBluePlusPlugin implements
     private final Map<String, BluetoothDevice> mBondingDevices = new ConcurrentHashMap<>();
     private final Map<String, Integer> mMtu = new ConcurrentHashMap<>();
     private final Map<String, Boolean> mAutoConnected = new ConcurrentHashMap<>();
-    private final Map<String, String> mWriteChr = new ConcurrentHashMap<>();
+    //private final Map<String, String> mWriteChr = new ConcurrentHashMap<>();
+    private final Map<String, byte[]> mWriteChr = new ConcurrentHashMap<>();
     private final Map<String, String> mWriteDesc = new ConcurrentHashMap<>();
     private final Map<String, String> mAdvSeen = new ConcurrentHashMap<>();
     private final Map<String, Integer> mScanCounts = new ConcurrentHashMap<>();
@@ -842,7 +843,8 @@ public class FlutterBluePlusPlugin implements
                     String serviceUuid =          (String) data.get("service_uuid");
                     String secondaryServiceUuid = (String) data.get("secondary_service_uuid");
                     String characteristicUuid =   (String) data.get("characteristic_uuid");
-                    String value =                (String) data.get("value");
+                    //String value =                (String) data.get("value");
+                    byte[] value =                (byte[]) data.get("value");
                     int writeTypeInt =               (int) data.get("write_type");
                     boolean allowLongWrite =        ((int) data.get("allow_long_write")) != 0;
 
@@ -886,7 +888,8 @@ public class FlutterBluePlusPlugin implements
 
                     // check maximum payload
                     int maxLen = getMaxPayload(remoteId, writeType, allowLongWrite);
-                    int dataLen = hexToBytes(value).length;
+                    //int dataLen = hexToBytes(value).length;
+                    int dataLen = value.length;
                     if (dataLen > maxLen) {
                         String a = writeTypeInt == 0 ? "withResponse" : "withoutResponse";
                         String b = writeTypeInt == 0 ? (allowLongWrite ? ", allowLongWrite" : ", noLongWrite") : "";
@@ -902,7 +905,8 @@ public class FlutterBluePlusPlugin implements
                     // write characteristic
                     if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
 
-                        int rv = gatt.writeCharacteristic(characteristic, hexToBytes(value), writeType);
+                        //int rv = gatt.writeCharacteristic(characteristic, hexToBytes(value), writeType);
+                        int rv = gatt.writeCharacteristic(characteristic, value, writeType);
 
                         if (rv != BluetoothStatusCodes.SUCCESS) {
                             String s = "gatt.writeCharacteristic() returned " + rv + " : " + bluetoothStatusString(rv);
@@ -912,7 +916,8 @@ public class FlutterBluePlusPlugin implements
 
                     } else {
                         // set value
-                        if(!characteristic.setValue(hexToBytes(value))) {
+                        //if(!characteristic.setValue(hexToBytes(value))) {
+                        if(!characteristic.setValue(value)) {
                             result.error("writeCharacteristic", "characteristic.setValue() returned false", null);
                             break;
                         }
@@ -2039,7 +2044,8 @@ public class FlutterBluePlusPlugin implements
                 response.put("secondary_service_uuid", uuidStr(pair.secondary));
             }
             response.put("characteristic_uuid", uuidStr(characteristic.getUuid()));
-            response.put("value", bytesToHex(value));
+            //response.put("value", bytesToHex(value));
+            response.put("value", value);
             response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
             response.put("error_code", status);
             response.put("error_string", gattErrorString(status));
@@ -2093,7 +2099,8 @@ public class FlutterBluePlusPlugin implements
 
             // what data did we write?
             String key = remoteId + ":" + serviceUuid + ":" + characteristicUuid;
-            String value = mWriteChr.get(key) != null ? mWriteChr.get(key) : "";
+            //String value = mWriteChr.get(key) != null ? mWriteChr.get(key) : "";
+            byte[] value = mWriteChr.get(key) != null ? mWriteChr.get(key) : new byte[0];
             mWriteChr.remove(key);
 
             // see: BmCharacteristicData

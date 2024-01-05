@@ -476,7 +476,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             NSString  *secondaryServiceUuid = args[@"secondary_service_uuid"];
             NSNumber  *writeTypeNumber      = args[@"write_type"];
             NSNumber  *allowLongWrite       = args[@"allow_long_write"];
-            NSString  *value                = args[@"value"];
+            //NSString  *value                = args[@"value"];
+            FlutterStandardTypedData *value = args[@"value"];
             
             // Find peripheral
             CBPeripheral *peripheral = [self getConnectedPeripheral:remoteId];
@@ -494,7 +495,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             // check maximum payload
             int maxLen = [self getMaxPayload:peripheral forType:writeType allowLongWrite:[allowLongWrite boolValue]];
-            int dataLen = (int) [self convertHexToData:value].length;
+            //int dataLen = (int) [self convertHexToData:value].length;
+            int dataLen = (int) value.data.length;
             if (dataLen > maxLen) {
                 NSString* t = [writeTypeNumber intValue] == 0 ? @"withResponse" : @"withoutResponse";
                 NSString* a = [allowLongWrite boolValue] ? @", allowLongWrite" : @", noLongWrite";
@@ -545,7 +547,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             [self.writeChrs setObject:value forKey:key];
                   
             // Write to characteristic
-            [peripheral writeValue:[self convertHexToData:value] forCharacteristic:characteristic type:writeType];
+            //[peripheral writeValue:[self convertHexToData:value] forCharacteristic:characteristic type:writeType];
+            [peripheral writeValue:value.data forCharacteristic:characteristic type:writeType];
 
             // remember the most recent write withoutResponse
             if (writeType == CBCharacteristicWriteWithoutResponse) {
@@ -1358,7 +1361,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         @"service_uuid":            [pair.primary.UUID uuidStr],
         @"secondary_service_uuid":  pair.secondary ? [pair.secondary.UUID uuidStr] : [NSNull null],
         @"characteristic_uuid":     [characteristic.UUID uuidStr],
-        @"value":                   [self convertDataToHex:characteristic.value],
+        //@"value":                   [self convertDataToHex:characteristic.value],
+        @"value":                   [FlutterStandardTypedData typedDataWithBytes:characteristic.value],
         @"success":                 error == nil ? @(1) : @(0),
         @"error_string":            error ? [error localizedDescription] : @"success",
         @"error_code":              error ? @(error.code) : @(0),
@@ -1391,7 +1395,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
     // what data did we write?
     NSString *key = [NSString stringWithFormat:@"%@:%@:%@", remoteId, serviceUuid, characteristicUuid];
-    NSString *value = self.writeChrs[key] ? self.writeChrs[key] : @"";
+    //NSString *value = self.writeChrs[key] ? self.writeChrs[key] : @"";
+    //NSData *valueData = [[NSData alloc] init];
+    FlutterStandardTypedData *value = self.writeChrs[key] ? self.writeChrs[key] : [FlutterStandardTypedData typedDataWithBytes: [NSData new]];
     [self.writeChrs removeObjectForKey:key];
 
     // See BmCharacteristicData
@@ -1618,7 +1624,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         @"service_uuid":            [pair.primary.UUID uuidStr],
         @"secondary_service_uuid":  pair.secondary ? [pair.secondary.UUID uuidStr] : [NSNull null],
         @"characteristic_uuid":     [characteristic.UUID uuidStr],
-        @"value":                   [self convertDataToHex:characteristic.value],
+        //@"value":                   [self convertDataToHex:characteristic.value],
+        @"value":                   [FlutterStandardTypedData typedDataWithBytes: characteristic.value ? characteristic.value : [NSData new]],
         @"success":                 @(error == nil),
         @"error_string":            error ? [error localizedDescription] : @"success",
         @"error_code":              error ? @(error.code) : @(0),
