@@ -266,7 +266,7 @@ public class FlutterBluePlusPlugin implements
     //  ██████  ██   ██  ███████  ███████
 
     @Override
-    @SuppressWarnings({"deprecation", "unchecked"}) // needed for compatability, type safety uses bluetooth_msgs.dart
+    @SuppressWarnings({"deprecation", "unchecked"}) // needed for compatibility, type safety uses bluetooth_msgs.dart
     public void onMethodCall(@NonNull MethodCall call,
                                  @NonNull Result result)
     {
@@ -1719,6 +1719,60 @@ public class FlutterBluePlusPlugin implements
         mAutoConnected.clear();
     }
 
+    int getAppearanceFromScanRecord(ScanRecord adv) {
+
+        if (Build.VERSION.SDK_INT >= 33) { // Android 13 (August 2022)
+            Map<Integer, byte[]> map = adv.getAdvertisingDataMap();
+            if (map.containsKey(ScanRecord.DATA_TYPE_APPEARANCE)) {
+                byte[] bytes = map.get(ScanRecord.DATA_TYPE_APPEARANCE);
+                if (bytes.length == 2) {
+                    int loByte = bytes[0] & 0xFF;
+                    int hiByte = bytes[1] & 0xFF;
+                    return hiByte * 256 + loByte;
+                }
+            }
+            return 0;
+        }
+
+        // For API Level 21+
+        byte[] bytes = adv.getBytes();
+
+        int n = 0;
+
+        while (n < bytes.length) {
+
+            int fieldLen = bytes[n];
+
+            // no more or malformed data
+            if (fieldLen <= 0) {
+                break;
+            }
+
+            // end of packet
+            if (fieldLen + n > bytes.length - 1) {
+                break;
+            }
+
+            int dataType = bytes[n + 1];
+
+            // no more data
+            if (dataType == 0) {
+                break;
+            }
+
+            // appearance type byte
+            if (dataType == 0x19 && fieldLen == 3) {
+                int loByte = bytes[n + 2] & 0xFF;
+                int hiByte = bytes[n + 3] & 0xFF;
+                return hiByte * 256 + loByte;
+            }
+
+            n += fieldLen + 1;
+        }
+
+        return 0;
+    }
+
     /////////////////////////////////////////////////////////////////////////////////////
     //  █████   ██████    █████   ██████   ████████  ███████  ██████
     // ██   ██  ██   ██  ██   ██  ██   ██     ██     ██       ██   ██
@@ -2302,6 +2356,7 @@ public class FlutterBluePlusPlugin implements
 
         String                  advName      = adv != null ?  adv.getDeviceName()                : null;
         int                     txPower      = adv != null ?  adv.getTxPowerLevel()              : min;
+        int                     appearance   = adv != null ?  getAppearanceFromScanRecord(adv)   : 0;
         SparseArray<byte[]>     manufData    = adv != null ?  adv.getManufacturerSpecificData()  : null;
         List<ParcelUuid>        serviceUuids = adv != null ?  adv.getServiceUuids()              : null;
         Map<ParcelUuid, byte[]> serviceData  = adv != null ?  adv.getServiceData()               : null;
@@ -2342,6 +2397,7 @@ public class FlutterBluePlusPlugin implements
         if (connectable)                 {map.put("connectable", 1);}
         if (advName != null)             {map.put("adv_name", advName);}
         if (txPower != min)              {map.put("tx_power_level", txPower);}
+        if (appearance != 0)             {map.put("appearance", appearance);}
         if (manufData != null)           {map.put("manufacturer_data", manufDataB);}
         if (serviceData != null)         {map.put("service_data", serviceDataB);}
         if (serviceUuids != null)        {map.put("service_uuids", serviceUuidsB);}
@@ -2677,7 +2733,7 @@ public class FlutterBluePlusPlugin implements
             case 0x05: return "AUTHENTICATION_FAILURE"; // Pairing or authentication failed. This could be due to an incorrect PIN or Link Key.
             case 0x06: return "PIN_OR_KEY_MISSING"; // Pairing failed because of a missing PIN
             case 0x07: return "MEMORY_FULL"; // The Controller has run out of memory to store new parameters.
-            case 0x08: return "CONNECTION_TIMEOUT"; // The link supervision timeout has expired for a given connection.
+            case 0x08: return "LINK_SUPERVISION_TIMEOUT"; // The link supervision timeout has expired for a given connection.
             case 0x09: return "CONNECTION_LIMIT_EXCEEDED"; // The Controller is already at its limit of the number of connections it can support.
             case 0x0A: return "MAX_NUM_OF_CONNECTIONS_EXCEEDED"; // The Controller has reached the limit of connections
             case 0x0B: return "CONNECTION_ALREADY_EXISTS"; // A connection to this device already exists 

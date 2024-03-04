@@ -1,3 +1,34 @@
+## 1.31.15
+* **[Feature]** support advertising `appearance` on Android
+
+## 1.31.14
+* **[Fix]** autoconnect could not disconnect if there are multiple devices
+
+## 1.31.13
+* **[Improve]**  android: use name `LINK_SUPERVISION_TIMEOUT` instead of `CONNECTION_TIMEOUT`
+
+## 1.31.12
+* **[Improve]** improve reliability of autoconnect on android
+
+## 1.31.11
+* **[Feature]** add convenience function to get raw `msd` data in advertisement
+
+## 1.31.10
+* **[Fix]** type 'DeviceIdentifier' is not a subtype of type 'String' (regression 1.31.9)
+
+## 1.31.9
+* **[Feature]** add `cancelAfterDisconnection` `delayed` option for `connectionState` streams
+* **[Feature]** add `device.isDisconnected`
+
+## 1.31.8
+* **[Fix]** stream asserts when calling `startScan` twice quickly
+
+## 1.31.7
+* **[Fix]** `cancelWhenScanComplete` must handle error cases
+
+## 1.31.6
+* **[Feature]** add `cancelWhenScanComplete` convenience function
+
 ## 1.31.5
 * **[Improve]** Updated README & Example app
 

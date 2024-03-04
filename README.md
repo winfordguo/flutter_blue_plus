@@ -121,7 +121,7 @@ if (await FlutterBluePlus.isSupported == false) {
 // handle bluetooth on & off
 // note: for iOS the initial state is typically BluetoothAdapterState.unknown
 // note: if you have permissions issues you will get stuck at BluetoothAdapterState.unauthorized
-FlutterBluePlus.adapterState.listen((BluetoothAdapterState state) {
+var subscription = FlutterBluePlus.adapterState.listen((BluetoothAdapterState state) {
     print(state);
     if (state == BluetoothAdapterState.on) {
         // usually start scanning, connecting, etc
@@ -135,6 +135,9 @@ FlutterBluePlus.adapterState.listen((BluetoothAdapterState state) {
 if (Platform.isAndroid) {
     await FlutterBluePlus.turnOn();
 }
+
+// cancel to prevent duplicate listeners
+subscription.cancel();
 ```
 
 ### Scan for devices
@@ -143,12 +146,10 @@ If your device is not found, see [Common Problems](#common-problems).
 
 **Note:** It is recommended to set scan filters to reduce main thread & platform channel usage.
 
-**Note:** scan filters use an ***"or"*** behavior. i.e. if you set `withServices` & `withNames` we return  all the advertisments that match any of the specified services ***or*** any of the specified names.
-
 ```dart
 // listen to scan results
 // Note: `onScanResults` only returns live scan results, i.e. during scanning
-// Use: `scanResults` if you want live scan results *or* the previous results
+// Use: `scanResults` if you want live scan results *or* the results from a previous scan
 var subscription = FlutterBluePlus.onScanResults.listen((results) {
         if (results.isNotEmpty) {
             ScanResult r = results.last; // the most recently found device
@@ -158,19 +159,25 @@ var subscription = FlutterBluePlus.onScanResults.listen((results) {
     onError: (e) => print(e),
 );
 
+// cleanup: cancel subscription when scanning stops
+FlutterBluePlus.cancelWhenScanComplete(subscription);
+
 // Wait for Bluetooth enabled & permission granted
 // In your real app you should use `FlutterBluePlus.adapterState.listen` to handle all states
 await FlutterBluePlus.adapterState.where((val) => val == BluetoothAdapterState.on).first;
 
 // Start scanning w/ timeout
-// optional: use `stopScan()` to stop the scan at anytime
-await FlutterBluePlus.startScan(withServices:[Guid("180D")], timeout: Duration(seconds:15));
+// Optional: you can use `stopScan()` as an alternative to using a timeout
+// Note: scan filters use an *or* behavior. i.e. if you set `withServices` & `withNames`
+//   we return all the advertisments that match any of the specified services *or* any
+//   of the specified names.
+await FlutterBluePlus.startScan(
+  withServices:[Guid("180D")],
+  withNames:["Bluno"],
+  timeout: Duration(seconds:15));
 
 // wait for scanning to stop
 await FlutterBluePlus.isScanning.where((val) => val == false).first;
-
-// cancel to prevent duplicate listeners
-subscription.cancel();
 ```
 
 ### Connect to a device
@@ -185,6 +192,12 @@ var subscription = device.connectionState.listen((BluetoothConnectionState state
         print("${device.disconnectReasonCode} ${device.disconnectReasonDescription}");
     }
 });
+
+// cleanup: cancel subscription when disconnected
+// Note: `delayed:true` lets us receive the `disconnected` event in our handler
+// Note: `next:true` means cancel on *next* disconnection. Without this, it
+//   would cancel immediately because we're already disconnected right now.
+device.cancelWhenDisconnected(subscription, delayed:true, next:true);
 
 // Connect to the device
 await device.connect();
@@ -202,10 +215,13 @@ Connects whenever your device is found.
 
 ```dart
 // enable auto connect
-//  - this function always returns immediately
-//  - you must listen to `device.connectionState` to know when connection occurs 
-//  - autoConnect is incompatible with mtu argument, so you must call requestMtu yourself
-await device.connect(mtu:null, autoConnect:true)
+//  - note: autoConnect is incompatible with mtu argument, so you must call requestMtu yourself
+await device.connect(autoConnect:true, mtu:null)
+
+// wait until connection
+//  - when using autoConnect, connect() always returns immediately, so we must
+//    explicity listen to `device.connectionState` to know when connection occurs 
+await device.connectionState.where((val) => val == BluetoothConnectionState.connected).first;
 
 // disable auto connect
 await device.disconnect()
@@ -444,7 +460,7 @@ To mock `FlutterBluePlus` for development, refer to the [Mocking Guide](MOCKING.
 flutter_blue_plus is compatible only from version 21 of Android SDK so you should change this in **android/app/build.gradle**:
 
 ```dart
-Android {
+android {
   defaultConfig {
      minSdkVersion: 21
 ```
@@ -474,7 +490,7 @@ https://developer.android.com/about/versions/12/features/bluetooth-permissions -
 
 ### Add permissions for Android (With Fine Location)
 
-If you want to use Bluetooth to determine location.
+If you want to use Bluetooth to determine location, or support iBeacons.
 
 In the **android/app/src/main/AndroidManifest.xml** add:
 
@@ -497,7 +513,7 @@ https://developer.android.com/about/versions/12/features/bluetooth-permissions -
 <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="28" />
 ```
 
-And set androidUsesFineLocation when scanning:
+And set **androidUsesFineLocation** when scanning:
 ```dart
 // Start scanning
 flutterBlue.startScan(timeout: Duration(seconds: 4), androidUsesFineLocation: true);
@@ -539,7 +555,9 @@ In the **ios/Runner/Info.plist** let’s add:
 
 For location permissions on iOS see more at: [https://developer.apple.com/documentation/corelocation/requesting_authorization_for_location_services](https://developer.apple.com/documentation/corelocation/requesting_authorization_for_location_services)
 
-And in Xcode, add access to Bluetooth hardware: 
+### Add permissions for macOS 
+
+Make sure you have granted access to the Bluetooth hardware:
 
 `Xcode -> Runners -> Targets -> Runner-> Signing & Capabilities -> App Sandbox -> Hardware -> Enable Bluetooth`
 
@@ -547,7 +565,7 @@ And in Xcode, add access to Bluetooth hardware:
 
 ## Using Ble in App Background
 
-**This is an advanced use case**. FlutterBluePlus does not support everything. You may have to fork it.
+**This is an advanced use case**. FlutterBluePlus does not support everything. You may have to fork it. PRs are welcome.
 
 ### iOS
 
@@ -564,11 +582,13 @@ Add the following to your `Info.plist`
 
 When this key-value pair is included in the app’s Info.plist file, the system wakes up your app to process ble `read`, `write`, and `subscription` events.
 
+You may also have to use https://pub.dev/packages/flutter_isolate
+
 **Note**: Upon being woken up, an app has around 10 seconds to complete a task. Apps that spend too much time executing in the background can be throttled back by the system or killed.
 
 ### Android
 
-You can try using https://pub.dev/packages/flutter_foreground_task
+You can try using https://pub.dev/packages/flutter_foreground_task or possibly https://pub.dev/packages/flutter_isolate
 
 ## Reference
 
@@ -621,6 +641,7 @@ You can try using https://pub.dev/packages/flutter_foreground_task
 | connect                   | :white_check_mark: | :white_check_mark: | :fire: | Establishes a connection to the device                     |
 | disconnect                | :white_check_mark: | :white_check_mark: | :fire: | Cancels an active or pending connection to the device      |
 | isConnected             ⚡ | :white_check_mark: | :white_check_mark: |        | Is this device currently connected to *your app*?          |
+| isDisonnected           ⚡ | :white_check_mark: | :white_check_mark: |        | Is this device currently disconnected from *your app*?     |
 | connectionState        🌀 | :white_check_mark: | :white_check_mark: |        | Stream of connection changes for the Bluetooth Device      |
 | discoverServices          | :white_check_mark: | :white_check_mark: | :fire: | Discover services                                          |
 | servicesList            ⚡ | :white_check_mark: | :white_check_mark: |        | The current list of available services                     |
@@ -684,12 +705,13 @@ Many common problems are easily solved.
 
 Adapter:
 - [bluetooth must be turned on](#bluetooth-must-be-turned-on)
+- [adapterState is not 'on' but my Bluetooth is on](#adapterstate-is-not-on-but-my-bluetooth-is-on)
 - [adapterState is called multiple times](#adapterstate-is-called-multiple-times)
-- [adapterState is `unavailable`](#adapterstate-is-unavailable)
 
 Scanning:
 - [Scanning does not find my device](#scanning-does-not-find-my-device)
 - [Scanned device never goes away](#scanned-device-never-goes-away)
+- [iBeacons not showing](#ibeacons-not-showing)
 
 Connecting:
 - [Connection fails](#connection-fails)
@@ -709,6 +731,7 @@ Subscriptions:
 
 Android Errors:
 - [ANDROID_SPECIFIC_ERROR](#android_specific_error)
+- [android pairing popup appears twice](#android-pairing-popup-appears-twice)
 
 Flutter Errors:
 - [MissingPluginException(No implementation found for method XXXX ...)](#missingpluginexceptionno-implementation-found-for-method-xxxx-)
@@ -725,6 +748,34 @@ You can also use `FlutterBluePlus.adapterState.listen(...)`. See [Usage](#usage)
 
 ---
 
+### adapterState is not 'on' but my Bluetooth is on
+
+**For iOS:**
+
+`adapterState` always starts as `unknown`. You need to wait longer for the service to initialize. Use this code:
+
+```
+// wait for actual adapter state, up to 3 seconds
+Set<BluetoothAdapterState> inProgress = {BluetoothAdapterState.unknown, BluetoothAdapterState.turningOn};
+var adapterState = FlutterBluePlus.adapterState.where((v) => !inProgress.contains(v)).first;
+await adapterState.timeout(const Duration(seconds: 3)).onError((error, stackTrace) {
+   throw Exception("Could not determine Bluetooth state. ${FlutterBluePlus.adapterStateNow}");
+});
+
+// check adapter state
+if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
+   throw Exception("Bluetooth Is Not On. ${FlutterBluePlus.adapterStateNow}");
+}
+```
+
+If `adapterState` is `unavailable`, you must add access to Bluetooth Hardware in the app's Xcode settings. See [Getting Started](#getting-started).
+
+**For Android:**
+
+Check that your device supports Bluetooth & has permissions.
+
+---
+
 ### adapterState is called multiple times
 
 You are forgetting to cancel the original `FlutterBluePlus.adapterState.listen` resulting in multiple listeners.
@@ -738,14 +789,6 @@ final subscription ??= FlutterBluePlus.adapterState.listen((value) {
 // also, make sure you cancel the subscription when done!
 subscription.cancel()
 ```
-
----
-
-### adapterState is unavailable
-
-**iOS:** You must add access to Bluetooth Hardware in the app's Xcode settings. See [Getting Started](#getting-started).
-
-**Android:** check that your device supports Bluetooth & has permissions
 
 ---
 
@@ -797,6 +840,19 @@ for (var d in system) {
 This is expected.
 
 You must set the `removeIfGone` scan option if you want the device to go away when no longer available.
+
+---
+
+### iBeacons Not Showing
+
+**iOS:**
+
+iOS does not support iBeacons using CoreBluetooth. You must find a plugin meant for CoreLocation.
+
+**Android:**
+
+1. you need to enable location permissions, see [Getting Started](#getting-started)
+2. you must pass `androidUsesFineLocation:true` to the `startScan` method.
 
 ---
 
@@ -1031,6 +1087,14 @@ There is no 100% solution.
 FBP already has mitigations for this error, but Android will still fail with this code randomly. 
 
 The recommended solution is to `catch` the error, and retry.
+
+---
+
+### android pairing popup appears twice
+
+This is a bug in android itself.
+
+You can call `createBond()` yourself just after connecting and this will resolve the issue.
 
 ---
 
